@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NJ Territory Map</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #f0f2f5;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+    }
+
+    header {
+      width: 100%;
+      max-width: 900px;
+      margin-bottom: 16px;
+    }
+
+    header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      color: #1a1a2e;
+    }
+
+    header p {
+      font-size: 13px;
+      color: #888;
+      margin-top: 2px;
+    }
+
+    #map-container {
+      position: relative;
+      width: 100%;
+      max-width: 900px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+
+    #map {
+      display: block;
+      width: 100%;
+      cursor: pointer;
+      background: #e8edf2;
+    }
+
+    /* ── County & Municipality paths ─────────────────────── */
+    .county-fill {
+      transition: opacity 0.15s;
+    }
+    .county-fill:hover {
+      opacity: 0.78;
+    }
+    .county-border {
+      fill: none;
+      stroke: #555;
+      stroke-width: 1px;
+      pointer-events: none;
+    }
+    .mun-fill {
+      pointer-events: all;
+      transition: opacity 0.1s;
+    }
+    .mun-fill:hover {
+      opacity: 0.75;
+    }
+    .mun-border {
+      fill: none;
+      stroke: #ccc;
+      stroke-width: 0.3px;
+      pointer-events: none;
+    }
+
+    /* ── Tooltip ─────────────────────────────────────────── */
+    #tooltip {
+      position: absolute;
+      background: rgba(255, 255, 255, 0.97);
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.12s;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+      max-width: 220px;
+      z-index: 50;
+    }
+    #tooltip.visible { opacity: 1; }
+    #tooltip h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1a1a2e;
+      margin-bottom: 5px;
+      line-height: 1.3;
+    }
+    #tooltip p {
+      color: #555;
+      line-height: 1.7;
+    }
+    #tooltip .tier-badge {
+      display: inline-block;
+      background: #f0f2f5;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 0 5px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #444;
+      margin-left: 2px;
+    }
+
+    /* ── Legend ──────────────────────────────────────────── */
+    #legend {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: rgba(255, 255, 255, 0.97);
+      border: 1px solid #e0e0e0;
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      min-width: 198px;
+      z-index: 40;
+    }
+    #legend h3 {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #888;
+      margin-bottom: 10px;
+    }
+    .legend-section { margin-bottom: 12px; }
+    .legend-section:last-child { margin-bottom: 0; }
+    .legend-section h4 {
+      font-size: 10px;
+      text-transform: uppercase;
+      color: #aaa;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    .legend-item {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 6px;
+    }
+    .legend-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      border: 1px solid rgba(0,0,0,0.12);
+      margin-right: 8px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .legend-text { color: #333; line-height: 1.4; }
+    .legend-sub {
+      font-size: 10px;
+      color: #aaa;
+      display: block;
+    }
+    .tier-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 4px;
+      color: #444;
+    }
+    .tier-pill {
+      width: 26px;
+      height: 17px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+      background: #f5f5f5;
+      font-size: 9px;
+      font-weight: 700;
+      color: #555;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 8px;
+      flex-shrink: 0;
+    }
+    .legend-hint {
+      font-size: 10px;
+      color: #bbb;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #f0f0f0;
+    }
+
+    /* ── Back button ──────────────────────────────────────── */
+    #back-btn {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 7px;
+      padding: 7px 13px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: none;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      color: #333;
+      z-index: 40;
+    }
+    #back-btn:hover { background: #f5f5f5; }
+
+    /* ── Loading overlay ─────────────────────────────────── */
+    #loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(232, 237, 242, 0.9);
+      font-size: 14px;
+      color: #777;
+      gap: 10px;
+      z-index: 99;
+    }
+    .spinner {
+      width: 28px;
+      height: 28px;
+      border: 3px solid #ddd;
+      border-top-color: #999;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>New Jersey — Sales Territory Map</h1>
+    <p>Click a county to zoom in and explore municipality boundaries. Click the background or use the back button to reset.</p>
+  </header>
+
+  <div id="map-container">
+    <svg id="map" viewBox="0 0 860 960" aria-label="New Jersey territory map"></svg>
+
+    <div id="tooltip"></div>
+
+    <div id="legend">
+      <h3>Legend</h3>
+      <div class="legend-section">
+        <h4>Territories</h4>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:#B5D4F4"></div>
+          <div class="legend-text">
+            A &mdash; NE Urban Corridor
+            <span class="legend-sub" id="acct-A">&mdash; accounts</span>
+          </div>
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:#CECBF6"></div>
+          <div class="legend-text">
+            B &mdash; Interior North + Shore
+            <span class="legend-sub" id="acct-B">&mdash; accounts</span>
+          </div>
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:#9FE1CB"></div>
+          <div class="legend-text">
+            C &mdash; Southern + South Jersey
+            <span class="legend-sub" id="acct-C">&mdash; accounts</span>
+          </div>
+        </div>
+      </div>
+      <div class="legend-section">
+        <h4>Tier Classification</h4>
+        <div class="tier-row">
+          <div class="tier-pill">T1</div>25,000+ population
+        </div>
+        <div class="tier-row">
+          <div class="tier-pill">T2</div>10,000&ndash;25,000
+        </div>
+        <div class="tier-row">
+          <div class="tier-pill">T3</div>Sub-10,000
+        </div>
+      </div>
+      <div class="legend-hint">Click any county to zoom in</div>
+    </div>
+
+    <button id="back-btn">&#8592; Back to State</button>
+
+    <div id="loading">
+      <div class="spinner"></div>
+      Loading map data&hellip;
+    </div>
+  </div>
+
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script>
+    // ============================================================
+    //  CONFIGURATION — edit territory colors and assignments here
+    // ============================================================
+
+    // Territory color variables (swap these out when switching to configurable palette)
+    const COLORS = {
+      A: "#B5D4F4",  // light blue  — NE Urban Corridor
+      B: "#CECBF6",  // light purple — Interior North + Shore
+      C: "#9FE1CB",  // light teal  — Southern + South Jersey
+    };
+
+    const TERRITORIES = {
+      A: {
+        name: "NE Urban Corridor",
+        color: COLORS.A,
+        counties: ["Bergen","Essex","Hudson","Passaic","Union","Middlesex"],
+      },
+      B: {
+        name: "Interior North + Shore",
+        color: COLORS.B,
+        counties: ["Morris","Sussex","Warren","Hunterdon","Somerset","Mercer","Monmouth"],
+      },
+      C: {
+        name: "Southern Shore + South Jersey",
+        color: COLORS.C,
+        counties: ["Ocean","Burlington","Camden","Atlantic","Gloucester","Cape May","Cumberland","Salem"],
+      },
+    };
+
+    // Data sources (njam-data public repos — CORS-safe raw GitHub)
+    const COUNTY_URL = "https://raw.githubusercontent.com/njam-data/new-jersey-counties/main/data/new-jersey-counties.geojson";
+    const MUN_URL    = "https://raw.githubusercontent.com/njam-data/new-jersey-municipalities/main/data/new-jersey-municipalities-simplified-geojson.json";
+
+    // ============================================================
+    //  LOOKUP TABLES
+    // ============================================================
+
+    // county name (lowercase) -> territory key
+    const countyToTerritory = {};
+    for (const [key, t] of Object.entries(TERRITORIES)) {
+      for (const c of t.counties) countyToTerritory[c.toLowerCase()] = key;
+    }
+
+    // county abbreviation/code -> normalized full name (populated after data load)
+    const countyAbbrToName = {};
+
+    function normalizeName(s) {
+      return (s || "").replace(/ county$/i, "").trim();
+    }
+
+    function getTier(pop) {
+      const p = parseInt(pop, 10) || 0;
+      if (p >= 25000) return "T1";
+      if (p >= 10000) return "T2";
+      return "T3";
+    }
+
+    function fmtPop(pop) {
+      const p = parseInt(pop, 10) || 0;
+      return p > 0 ? p.toLocaleString() : "—";
+    }
+
+    // ============================================================
+    //  SVG / PROJECTION SETUP
+    // ============================================================
+    const W = 860, H = 960;
+
+    const svg        = d3.select("#map");
+    const gMap       = svg.append("g").attr("id", "g-map");
+    const gCounty    = gMap.append("g").attr("id", "g-county-fills");
+    const gMunFill   = gMap.append("g").attr("id", "g-mun-fills").style("display","none");
+    const gMunBorder = gMap.append("g").attr("id", "g-mun-borders").style("display","none");
+    const gCountyBdr = gMap.append("g").attr("id", "g-county-borders");
+
+    const projection = d3.geoMercator();
+    const pathGen    = d3.geoPath().projection(projection);
+
+    // ============================================================
+    //  ZOOM BEHAVIOR
+    // ============================================================
+    let currentK    = 1;
+    let zoomedName  = null;   // normalized county name currently zoomed
+
+    const zoomBehavior = d3.zoom()
+      .scaleExtent([1, 14])
+      .on("zoom", onZoom);
+
+    svg.call(zoomBehavior);
+
+    function onZoom(event) {
+      currentK = event.transform.k;
+      gMap.attr("transform", event.transform);
+
+      // Scale borders so they stay visually consistent
+      gCountyBdr.selectAll("path").attr("stroke-width", 1 / currentK);
+      gCounty.selectAll("path").attr("stroke-width", 0);     // fill layer, no stroke
+      gMunBorder.selectAll("path").attr("stroke-width", 0.3 / currentK);
+
+      // Reveal municipality layer at zoom >= 2
+      const showMun = currentK >= 2;
+      gMunFill.style("display",   showMun ? null : "none");
+      gMunBorder.style("display", showMun ? null : "none");
+    }
+
+    function zoomToFeature(feature) {
+      const [[x0, y0], [x1, y1]] = pathGen.bounds(feature);
+      const scale = Math.min(
+        (W / (x1 - x0)),
+        (H / (y1 - y0))
+      ) * 0.82;
+      const clamped = Math.min(scale, 14);
+      const tx = (W - clamped * (x0 + x1)) / 2;
+      const ty = (H - clamped * (y0 + y1)) / 2;
+      svg.transition().duration(420)
+        .call(zoomBehavior.transform,
+              d3.zoomIdentity.translate(tx, ty).scale(clamped));
+    }
+
+    function resetZoom() {
+      svg.transition().duration(380)
+        .call(zoomBehavior.transform, d3.zoomIdentity);
+    }
+
+    // ============================================================
+    //  TOOLTIP
+    // ============================================================
+    const tooltipEl = document.getElementById("tooltip");
+
+    function showTooltip(event, html) {
+      tooltipEl.innerHTML = html;
+      tooltipEl.classList.add("visible");
+      positionTooltip(event);
+    }
+
+    function positionTooltip(event) {
+      const rect = document.getElementById("map-container").getBoundingClientRect();
+      let x = event.clientX - rect.left + 16;
+      let y = event.clientY - rect.top  - 12;
+      const tipW = 230, tipH = 120;
+      if (x + tipW > rect.width)  x -= tipW + 32;
+      if (y + tipH > rect.height) y -= tipH;
+      if (x < 0) x = 8;
+      if (y < 0) y = 8;
+      tooltipEl.style.left = x + "px";
+      tooltipEl.style.top  = y + "px";
+    }
+
+    function hideTooltip() {
+      tooltipEl.classList.remove("visible");
+    }
+
+    // ============================================================
+    //  COUNTY NAME HELPERS
+    // ============================================================
+    function countyNameFromFeature(f) {
+      const p = f.properties;
+      if (p.county_label) return normalizeName(p.county_label);
+      if (p.NAME)         return normalizeName(p.NAME);
+      return normalizeName(p.name || "");
+    }
+
+    function countyNameFromMun(f) {
+      const raw = (f.properties.county || "").trim();
+      // Try abbreviation lookup first, then treat as full name
+      return countyAbbrToName[raw] || countyAbbrToName[raw.toLowerCase()] || normalizeName(raw);
+    }
+
+    function territoryForCounty(name) {
+      return countyToTerritory[(name || "").toLowerCase()];
+    }
+
+    function fillColor(countyName) {
+      const t = territoryForCounty(countyName);
+      return t ? TERRITORIES[t].color : "#d0d0d0";
+    }
+
+    // ============================================================
+    //  RENDER
+    // ============================================================
+    function render(counties, municipalities) {
+      // Fit projection to NJ extent
+      projection.fitExtent([[20, 20], [W - 20, H - 20]], counties);
+
+      // Build abbreviation -> normalized name map from counties data
+      counties.features.forEach(f => {
+        const abbr = (f.properties.county || "").trim();
+        const full = countyNameFromFeature(f);
+        if (abbr) {
+          countyAbbrToName[abbr]              = full;
+          countyAbbrToName[abbr.toLowerCase()] = full;
+        }
+        countyAbbrToName[full.toLowerCase()] = full;
+      });
+
+      // ── Municipality fills (behind county layer visually but above for events when zoomed) ──
+      gMunFill.selectAll("path")
+        .data(municipalities.features)
+        .join("path")
+        .attr("class", "mun-fill")
+        .attr("d", pathGen)
+        .attr("fill", f => {
+          const cName = countyNameFromMun(f);
+          return fillColor(cName);
+        })
+        .attr("stroke", "none")
+        .on("mousemove", (event, f) => {
+          event.stopPropagation();
+          const p      = f.properties;
+          const cName  = countyNameFromMun(f);
+          const tKey   = territoryForCounty(cName) || "?";
+          const pop    = parseInt(p.pop2010, 10) || 0;
+          const tier   = getTier(pop);
+          const label  = p.mun_label || p.name || "Unknown";
+          showTooltip(event, `
+            <h4>${label}</h4>
+            <p>
+              County: ${cName || "—"}<br>
+              Territory: ${tKey}${tKey !== "?" ? " &mdash; " + TERRITORIES[tKey].name : ""}<br>
+              Tier: <span class="tier-badge">${tier}</span><br>
+              Population: ${fmtPop(pop)}
+            </p>
+          `);
+        })
+        .on("mouseleave", (event) => {
+          event.stopPropagation();
+          hideTooltip();
+        })
+        .on("click", (event) => {
+          // Prevent click bubbling to SVG background (would trigger unwanted reset)
+          event.stopPropagation();
+        });
+
+      // ── County fills ──────────────────────────────────────────
+      gCounty.selectAll("path")
+        .data(counties.features)
+        .join("path")
+        .attr("class", "county-fill")
+        .attr("d", pathGen)
+        .attr("fill", f => fillColor(countyNameFromFeature(f)))
+        .attr("stroke", "none")
+        .on("click", (event, f) => {
+          event.stopPropagation();
+          const name = countyNameFromFeature(f);
+          if (zoomedName === name) {
+            // Second click on same county → zoom out
+            zoomedName = null;
+            document.getElementById("back-btn").style.display = "none";
+            resetZoom();
+          } else {
+            zoomedName = name;
+            document.getElementById("back-btn").style.display = "block";
+            zoomToFeature(f);
+          }
+        })
+        .on("mousemove", (event, f) => {
+          const p    = f.properties;
+          const name = countyNameFromFeature(f);
+          const tKey = territoryForCounty(name) || "?";
+          const pop  = parseInt(p.pop2010, 10) || 0;
+          const tier = getTier(pop);
+          showTooltip(event, `
+            <h4>${name} County</h4>
+            <p>
+              Territory: ${tKey}${tKey !== "?" ? " &mdash; " + TERRITORIES[tKey].name : ""}<br>
+              Tier: <span class="tier-badge">${tier}</span><br>
+              Population: ${fmtPop(pop)}
+            </p>
+          `);
+        })
+        .on("mouseleave", hideTooltip);
+
+      // ── Municipality borders ───────────────────────────────────
+      gMunBorder.selectAll("path")
+        .data(municipalities.features)
+        .join("path")
+        .attr("class", "mun-border")
+        .attr("d", pathGen)
+        .attr("stroke", "#ccc")
+        .attr("stroke-width", 0.3)
+        .attr("fill", "none");
+
+      // ── County borders (topmost) ───────────────────────────────
+      gCountyBdr.selectAll("path")
+        .data(counties.features)
+        .join("path")
+        .attr("class", "county-border")
+        .attr("d", pathGen)
+        .attr("stroke", "#555")
+        .attr("stroke-width", 1)
+        .attr("fill", "none");
+
+      // Hide loading overlay
+      const loadEl = document.getElementById("loading");
+      loadEl.style.opacity = "0";
+      setTimeout(() => loadEl.style.display = "none", 300);
+    }
+
+    // ── Click SVG background → reset zoom ─────────────────────────
+    svg.on("click", () => {
+      if (zoomedName) {
+        zoomedName = null;
+        document.getElementById("back-btn").style.display = "none";
+        resetZoom();
+        hideTooltip();
+      }
+    });
+
+    document.getElementById("back-btn").addEventListener("click", () => {
+      zoomedName = null;
+      document.getElementById("back-btn").style.display = "none";
+      resetZoom();
+    });
+
+    // ============================================================
+    //  LOAD DATA
+    // ============================================================
+    Promise.all([
+      d3.json(COUNTY_URL),
+      d3.json(MUN_URL),
+    ])
+    .then(([counties, municipalities]) => {
+      render(counties, municipalities);
+    })
+    .catch(err => {
+      const loadEl = document.getElementById("loading");
+      loadEl.querySelector(".spinner").style.display = "none";
+      loadEl.querySelector("div:not(.spinner)") || (loadEl.innerHTML =
+        `<div style="color:#c00">Error loading map data.<br><small>${err.message}</small></div>`);
+      console.error("[NJ Map] Data load error:", err);
+    });
+
+
+    /* ============================================================
+       DATA LAYER
+       ============================================================
+       This section is intentionally separated from the static map
+       logic above. All Salesforce CSV integration lives here.
+
+       When your CSV export is ready, call:
+         loadSalesforceData("./data/accounts.csv")
+
+       Expected CSV columns (case-sensitive):
+         Account Name | County | Tier | Population | Territory
+
+       The function:
+         - Joins rows to map features by County name
+         - Updates legend account counts per territory
+         - Logs unmatched rows to console for QA
+         - Gracefully no-ops if the CSV path is missing / empty
+    ============================================================ */
+
+    /**
+     * Load Salesforce account data and overlay it on the map.
+     *
+     * @param {string} csvPath - Relative or absolute URL to the CSV file.
+     */
+    async function loadSalesforceData(csvPath) {
+      let rows;
+
+      // ── Attempt to fetch CSV ─────────────────────────────────
+      try {
+        rows = await d3.csv(csvPath);
+      } catch (err) {
+        // CSV not present yet — silent no-op is intentional
+        console.info(
+          "[loadSalesforceData] CSV not found or inaccessible — skipping data overlay.",
+          csvPath
+        );
+        return;
+      }
+
+      if (!rows || rows.length === 0) {
+        console.warn("[loadSalesforceData] CSV loaded but contains no rows.");
+        return;
+      }
+
+      // ── Process rows ─────────────────────────────────────────
+      const territoryCounts = { A: 0, B: 0, C: 0 };
+      const unmatched = [];
+
+      rows.forEach((row, i) => {
+        const rawCounty    = (row["County"]    || "").trim();
+        const rawTerritory = (row["Territory"] || "").trim().toUpperCase();
+
+        if (!rawCounty) {
+          unmatched.push({ rowIndex: i + 2, row, reason: "missing County value" });
+          return;
+        }
+
+        // Resolve territory: prefer explicit column, fall back to map lookup
+        const county    = normalizeName(rawCounty);
+        const territory = rawTerritory || territoryForCounty(county);
+
+        if (!territory || !territoryCounts.hasOwnProperty(territory)) {
+          unmatched.push({ rowIndex: i + 2, row, reason: `no territory match for county "${rawCounty}"` });
+          return;
+        }
+
+        territoryCounts[territory]++;
+
+        // ── TODO: dot overlay per account ───────────────────────
+        // Uncomment and extend when dot/pin layer is needed.
+        //
+        // const countyFeature = findCountyFeature(county);
+        // if (countyFeature) {
+        //   const [cx, cy] = pathGen.centroid(countyFeature);
+        //   gMap.append("circle")
+        //     .attr("cx", cx).attr("cy", cy).attr("r", 5 / currentK)
+        //     .attr("fill", "#e74c3c").attr("opacity", 0.75)
+        //     .append("title").text(row["Account Name"] || "Account");
+        // }
+      });
+
+      // ── Update legend account counts ─────────────────────────
+      for (const [key, count] of Object.entries(territoryCounts)) {
+        const el = document.getElementById(`acct-${key}`);
+        if (el) el.textContent = `${count.toLocaleString()} account${count !== 1 ? "s" : ""}`;
+      }
+
+      // ── Debug: log unmatched rows ─────────────────────────────
+      if (unmatched.length > 0) {
+        console.warn(
+          `[loadSalesforceData] ${unmatched.length} unmatched row(s) — review below:`,
+          unmatched
+        );
+      }
+
+      console.info(
+        `[loadSalesforceData] Processed ${rows.length} row(s). ` +
+        `Matched: ${rows.length - unmatched.length}. ` +
+        `Unmatched: ${unmatched.length}.`
+      );
+    }
+
+    // Uncomment the line below when your CSV export is ready:
+    // loadSalesforceData("./data/accounts.csv");
+
+    /* ============================================================
+       END DATA LAYER
+    ============================================================ */
+  </script>
+</body>
+</html>
