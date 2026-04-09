@@ -74,8 +74,8 @@
     }
     .mun-border {
       fill: none;
-      stroke: #ccc;
-      stroke-width: 0.3px;
+      stroke: #888;
+      stroke-width: 0.8px;
       pointer-events: none;
     }
 
@@ -402,7 +402,7 @@
       // Scale borders so they stay visually consistent
       gCountyBdr.selectAll("path").attr("stroke-width", 1 / currentK);
       gCounty.selectAll("path").attr("stroke-width", 0);     // fill layer, no stroke
-      gMunBorder.selectAll("path").attr("stroke-width", 0.3 / currentK);
+      gMunBorder.selectAll("path").attr("stroke-width", 0.8 / currentK);
 
       // Reveal municipality layer at zoom >= 2
       const showMun = currentK >= 2;
@@ -583,8 +583,8 @@
         .join("path")
         .attr("class", "mun-border")
         .attr("d", pathGen)
-        .attr("stroke", "#ccc")
-        .attr("stroke-width", 0.3)
+        .attr("stroke", "#888")
+        .attr("stroke-width", 0.8)
         .attr("fill", "none");
 
       // ── County borders (topmost) ───────────────────────────────
